@@ -173,7 +173,7 @@ function Search({ onPick, onScan }) {
       {local.length > 0 && (state.status === 'loading' || state.results.length > 0) && <h2 className="section-title">Produkte aus Open Food Facts</h2>}
       {state.status === 'loading' && <p className="muted center">Suche läuft …</p>}
       {state.status === 'error' && (
-        <p className="notice">Die Suche hat gerade nicht geklappt. Prüfe die Internetverbindung oder versuch es gleich nochmal. Du kannst auch einen eigenen Eintrag anlegen.</p>
+        <p className="notice">Die Produktsuche ist gerade nicht erreichbar. Barcode-Scan, Restaurantliste und eigene Einträge funktionieren trotzdem.</p>
       )}
       {state.status === 'done' && state.results.length === 0 && local.length === 0 && (
         <p className="notice">Nichts gefunden. Versuch einen anderen Begriff oder leg einen eigenen Eintrag an.</p>
