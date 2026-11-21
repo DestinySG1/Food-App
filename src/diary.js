@@ -50,7 +50,8 @@ export function parseOffProduct(p) {
   if (!p) return null
   const n = p.nutriments || {}
   let kcal = num(n['energy-kcal_100g'])
-  if (kcal == null && num(n['energy_100g']) != null) kcal = num(n['energy_100g']) / 4.184 // kJ → kcal
+  const kj = num(n['energy-kj_100g']) ?? num(n['energy_100g'])
+  if (kcal == null && kj != null) kcal = kj / 4.184 // kJ → kcal
   const name = (p.product_name_de || p.product_name || p.generic_name_de || p.generic_name || '').trim()
   if (kcal == null || !name) return null
   const serving = num(p.serving_quantity)
@@ -58,7 +59,7 @@ export function parseOffProduct(p) {
     id: `off:${p.code}`,
     code: p.code,
     name,
-    brand: (p.brands || '').split(',')[0].trim(),
+    brand: (Array.isArray(p.brands) ? p.brands[0] || '' : (p.brands || '').split(',')[0]).trim(),
     per100: {
       kcal: Math.round(kcal),
       protein: round1(num(n.proteins_100g) ?? 0),
@@ -88,4 +89,9 @@ export function isValidEan(code) {
     .reverse()
     .reduce((acc, d, i) => acc + d * (i % 2 === 0 ? 3 : 1), 0)
   return (10 - (sum % 10)) % 10 === check
+}
+
+// Nährwerte für eine Anzahl Portionen (z. B. 1 Burger, ½ Pizza)
+export function nutrientsForPortions(perPortion, count) {
+  return nutrientsFor(perPortion, (Number(count) || 0) * 100)
 }

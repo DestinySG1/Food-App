@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MEALS, nutrientsFor } from './diary.js'
+import { MEALS, nutrientsFor, nutrientsForPortions } from './diary.js'
+import { searchRestaurantFoods } from './restaurants.js'
 import { loadRecent } from './storage.js'
 import { searchFoods, lookupBarcode } from './off.js'
 import Scanner from './Scanner.jsx'
@@ -39,16 +40,20 @@ export default function AddFood({ meal, onAdd, onClose }) {
     else onClose()
   }
 
-  function addFood(food, grams) {
+  function addFood(food, amount) {
+    const portions = !!food.perPortion
     onAdd(
       {
         id: newId(),
         meal,
         name: food.name,
         brand: food.brand,
-        grams,
-        per100: food.per100,
-        totals: nutrientsFor(food.per100, grams),
+        grams: portions ? null : amount,
+        portions: portions ? amount : null,
+        portionLabel: portions ? food.portionLabel : null,
+        per100: food.per100 || null,
+        approx: !!food.approx,
+        totals: portions ? nutrientsForPortions(food.perPortion, amount) : nutrientsFor(food.per100, amount),
       },
       food,
     )
@@ -67,7 +72,11 @@ export default function AddFood({ meal, onAdd, onClose }) {
       </header>
 
       {selected ? (
-        <AmountPicker food={selected} onConfirm={(g) => addFood(selected, g)} />
+        selected.perPortion ? (
+          <PortionPicker food={selected} onConfirm={(n) => addFood(selected, n)} />
+        ) : (
+          <AmountPicker food={selected} onConfirm={(g) => addFood(selected, g)} />
+        )
       ) : scan?.status === 'scanning' ? (
         <Scanner onDetected={handleCode} />
       ) : scan ? (
@@ -110,6 +119,7 @@ function Search({ onPick, onScan }) {
   const [query, setQuery] = useState('')
   const [state, setState] = useState({ status: 'idle', results: [] })
   const [recent] = useState(() => loadRecent())
+  const local = query.trim().length >= 2 ? searchRestaurantFoods(query) : []
   const abortRef = useRef(null)
   const inputRef = useRef(null)
 
@@ -154,22 +164,29 @@ function Search({ onPick, onScan }) {
         <button type="submit" className="primary small-btn" disabled={query.trim().length < 2}>Suchen</button>
       </form>
 
+      {local.length > 0 && (
+        <section>
+          <h2 className="section-title">Restaurants &amp; Imbiss</h2>
+          <FoodList foods={local} onPick={onPick} />
+        </section>
+      )}
+      {local.length > 0 && (state.status === 'loading' || state.results.length > 0) && <h2 className="section-title">Produkte aus Open Food Facts</h2>}
       {state.status === 'loading' && <p className="muted center">Suche läuft …</p>}
       {state.status === 'error' && (
         <p className="notice">Die Suche hat gerade nicht geklappt. Prüfe die Internetverbindung oder versuch es gleich nochmal. Du kannst auch einen eigenen Eintrag anlegen.</p>
       )}
-      {state.status === 'done' && state.results.length === 0 && (
+      {state.status === 'done' && state.results.length === 0 && local.length === 0 && (
         <p className="notice">Nichts gefunden. Versuch einen anderen Begriff oder leg einen eigenen Eintrag an.</p>
       )}
       {state.status === 'done' && state.results.length > 0 && <FoodList foods={state.results} onPick={onPick} />}
 
-      {state.status === 'idle' && recent.length > 0 && (
+      {state.status === 'idle' && local.length === 0 && recent.length > 0 && (
         <section>
           <h2 className="section-title">Zuletzt verwendet</h2>
           <FoodList foods={recent} onPick={onPick} />
         </section>
       )}
-      {state.status === 'idle' && recent.length === 0 && (
+      {state.status === 'idle' && local.length === 0 && recent.length === 0 && (
         <p className="muted small center">Daten von Open Food Facts, der freien Lebensmitteldatenbank.</p>
       )}
     </>
@@ -186,7 +203,11 @@ function FoodList({ foods, onPick }) {
               <span className="food-name">{f.name}</span>
               {f.brand && <span className="muted small">{f.brand}</span>}
             </span>
-            <span className="food-kcal">{f.per100.kcal}<small> kcal/100 g</small></span>
+            {f.perPortion ? (
+              <span className="food-kcal">{f.perPortion.kcal}<small> kcal/{f.portionLabel}</small></span>
+            ) : (
+              <span className="food-kcal">{f.per100.kcal}<small> kcal/100 g</small></span>
+            )}
           </button>
         </li>
       ))}
@@ -231,6 +252,50 @@ function AmountPicker({ food, onConfirm }) {
       </div>
 
       <button className="primary" disabled={!valid} onClick={() => onConfirm(g)}>Eintragen</button>
+    </section>
+  )
+}
+
+function PortionPicker({ food, onConfirm }) {
+  const [count, setCount] = useState('1')
+  const n = Number(String(count).replace(',', '.'))
+  const valid = n > 0 && n <= 50
+  const t = nutrientsForPortions(food.perPortion, valid ? n : 0)
+  const presets = [0.5, 1, 2, 3]
+
+  return (
+    <section className="card form">
+      <div>
+        <h2 className="food-title">{food.name}</h2>
+        <p className="muted small no-margin">{food.brand} · {food.portionLabel}</p>
+      </div>
+
+      <label className="field">
+        <span className="field-label">Anzahl ({food.portionLabel})</span>
+        <span className="field-input">
+          <input inputMode="decimal" value={count} onChange={(e) => setCount(e.target.value)} aria-label="Anzahl Portionen" />
+          <span className="unit">×</span>
+        </span>
+      </label>
+      <div className="chips">
+        {presets.map((p) => (
+          <button key={p} type="button" className={n === p ? 'chip active' : 'chip'} onClick={() => setCount(String(p))}>
+            {p === 0.5 ? '½' : p} ×
+          </button>
+        ))}
+      </div>
+
+      <div className="nutri-grid">
+        <div><strong>{t.kcal}</strong><span>kcal</span></div>
+        <div><strong>{Math.round(t.protein)} g</strong><span>Eiweiß</span></div>
+        <div><strong>{Math.round(t.carbs)} g</strong><span>Kohlenh.</span></div>
+        <div><strong>{Math.round(t.fat)} g</strong><span>Fett</span></div>
+      </div>
+      {food.approx && (
+        <p className="muted small no-margin">Richtwerte. Bei Restaurants und Imbissen schwanken Rezepte und Portionsgrößen.</p>
+      )}
+
+      <button className="primary" disabled={!valid} onClick={() => onConfirm(n)}>Eintragen</button>
     </section>
   )
 }

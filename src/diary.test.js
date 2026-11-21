@@ -52,3 +52,9 @@ test('EAN-Prüfziffer', () => {
   assert.equal(isValidEan('12345'), false)
   assert.equal(isValidEan('abc'), false)
 })
+
+test('Format der neuen Suche (Marken als Liste, kJ-Feld)', () => {
+  const f = parseOffProduct({ code: '4013200254742', product_name_de: 'Haferflocken', brands: ['Bio Rinatura Haferflocken', 'Rinatura'], nutriments: { 'energy-kj_100g': 1565, proteins_100g: 13, carbohydrates_100g: 59, fat_100g: 7 } })
+  assert.equal(f.brand, 'Bio Rinatura Haferflocken')
+  assert.equal(f.per100.kcal, 374)
+})

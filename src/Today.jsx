@@ -61,7 +61,11 @@ export default function Today({ profile, day, onChangeDay, entries, onAdd, onRem
                     <span className="food-main">
                       <span className="food-name">{e.name}</span>
                       <span className="muted small">
-                        {[e.grams ? `${e.grams} g` : null, e.brand].filter(Boolean).join(' · ') || 'Eigener Eintrag'}
+                        {[
+                          e.grams ? `${e.grams} g` : null,
+                          e.portions ? portionText(e.portions, e.portionLabel) : null,
+                          e.brand,
+                        ].filter(Boolean).join(' · ') || 'Eigener Eintrag'}
                       </span>
                     </span>
                     <span className="entry-kcal">{e.totals.kcal} kcal</span>
@@ -92,6 +96,12 @@ export default function Today({ profile, day, onChangeDay, entries, onAdd, onRem
       </details>
     </main>
   )
+}
+
+function portionText(n, label) {
+  const num = String(n).replace('.', ',')
+  if (n === 1) return label
+  return label.startsWith('1 ') ? `${num} ${label.slice(2)}` : `${num} × ${label}`
 }
 
 function formatDay(key) {
