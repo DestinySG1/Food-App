@@ -77,3 +77,15 @@ function num(v) {
 function round1(x) {
   return Math.round(x * 10) / 10
 }
+
+// Prüft EAN-8, EAN-13 und UPC-A (12 Stellen) inklusive Prüfziffer
+export function isValidEan(code) {
+  const s = String(code || '').trim()
+  if (!/^(\d{8}|\d{12}|\d{13})$/.test(s)) return false
+  const digits = s.split('').map(Number)
+  const check = digits.pop()
+  const sum = digits
+    .reverse()
+    .reduce((acc, d, i) => acc + d * (i % 2 === 0 ? 3 : 1), 0)
+  return (10 - (sum % 10)) % 10 === check
+}

@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { MEALS, nutrientsFor } from './diary.js'
 import { loadRecent } from './storage.js'
-import { searchFoods } from './off.js'
+import { searchFoods, lookupBarcode } from './off.js'
+import Scanner from './Scanner.jsx'
 
 const newId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`
 
@@ -9,6 +10,34 @@ export default function AddFood({ meal, onAdd, onClose }) {
   const mealLabel = MEALS.find((m) => m.id === meal)?.label ?? 'Mahlzeit'
   const [tab, setTab] = useState('suche')
   const [selected, setSelected] = useState(null)
+  const [scan, setScan] = useState(null) // null | { status: 'scanning' | 'loading' | 'notfound' | 'error', code }
+  const abortRef = useRef(null)
+
+  useEffect(() => () => abortRef.current?.abort(), [])
+
+  const handleCode = useCallback(async (code) => {
+    abortRef.current?.abort()
+    const ctrl = new AbortController()
+    abortRef.current = ctrl
+    setScan({ status: 'loading', code })
+    try {
+      const food = await lookupBarcode(code, { signal: ctrl.signal })
+      if (food) {
+        setScan(null)
+        setSelected(food)
+      } else {
+        setScan({ status: 'notfound', code })
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') setScan({ status: 'error', code })
+    }
+  }, [])
+
+  function goBack() {
+    if (selected) setSelected(null)
+    else if (scan) setScan(null)
+    else onClose()
+  }
 
   function addFood(food, grams) {
     onAdd(
@@ -28,7 +57,7 @@ export default function AddFood({ meal, onAdd, onClose }) {
   return (
     <main className="screen">
       <header className="subbar">
-        <button className="icon-btn" onClick={selected ? () => setSelected(null) : onClose} aria-label="Zurück">
+        <button className="icon-btn" onClick={goBack} aria-label="Zurück">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5l-7 7 7 7" /></svg>
         </button>
         <div>
@@ -39,20 +68,45 @@ export default function AddFood({ meal, onAdd, onClose }) {
 
       {selected ? (
         <AmountPicker food={selected} onConfirm={(g) => addFood(selected, g)} />
+      ) : scan?.status === 'scanning' ? (
+        <Scanner onDetected={handleCode} />
+      ) : scan ? (
+        <ScanResult
+          scan={scan}
+          onRetry={() => setScan({ status: 'scanning' })}
+          onOwn={() => { setScan(null); setTab('eigen') }}
+        />
       ) : (
         <>
           <div className="segmented">
             <button className={tab === 'suche' ? 'active' : ''} onClick={() => setTab('suche')}>Suchen</button>
             <button className={tab === 'eigen' ? 'active' : ''} onClick={() => setTab('eigen')}>Eigener Eintrag</button>
           </div>
-          {tab === 'suche' ? <Search onPick={setSelected} /> : <QuickEntry onAdd={(e, f) => onAdd({ ...e, id: newId(), meal }, f)} />}
+          {tab === 'suche' ? <Search onPick={setSelected} onScan={() => setScan({ status: 'scanning' })} /> : <QuickEntry onAdd={(e, f) => onAdd({ ...e, id: newId(), meal }, f)} />}
         </>
       )}
     </main>
   )
 }
 
-function Search({ onPick }) {
+function ScanResult({ scan, onRetry, onOwn }) {
+  if (scan.status === 'loading') return <p className="muted center">Suche Produkt {scan.code} …</p>
+  return (
+    <section className="card form">
+      {scan.status === 'notfound' ? (
+        <p className="no-margin">
+          Das Produkt <strong>{scan.code}</strong> ist noch nicht in der Datenbank oder hat keine Nährwerte. Du kannst es als eigenen Eintrag anlegen.
+        </p>
+      ) : (
+        <p className="no-margin">Das Produkt konnte gerade nicht abgerufen werden. Prüfe die Internetverbindung.</p>
+      )}
+      <button className="primary" onClick={onOwn}>Eigenen Eintrag anlegen</button>
+      <button className="ghost" onClick={onRetry}>Nochmal scannen</button>
+    </section>
+  )
+}
+
+function Search({ onPick, onScan }) {
   const [query, setQuery] = useState('')
   const [state, setState] = useState({ status: 'idle', results: [] })
   const [recent] = useState(() => loadRecent())
@@ -60,7 +114,6 @@ function Search({ onPick }) {
   const inputRef = useRef(null)
 
   useEffect(() => {
-    inputRef.current?.focus()
     return () => abortRef.current?.abort()
   }, [])
 
@@ -82,6 +135,13 @@ function Search({ onPick }) {
 
   return (
     <>
+      <button className="scan-btn" onClick={onScan}>
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+          <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" />
+          <path d="M7 8v8M10 8v8M13 8v8M17 8v8" />
+        </svg>
+        Barcode scannen
+      </button>
       <form className="searchbar" onSubmit={run} role="search">
         <input
           ref={inputRef}

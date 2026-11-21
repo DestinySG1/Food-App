@@ -173,3 +173,31 @@ details.info[open] summary { margin-bottom: 10px; }
 .nutri-grid div { background: var(--bg); border-radius: 12px; padding: 10px 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .nutri-grid span { color: var(--muted); font-size: .75rem; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* Scanner */
+.scan-btn {
+  display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
+  border: 1.5px dashed var(--brand); background: var(--brand-soft); color: var(--brand);
+  border-radius: 14px; padding: 14px; font-weight: 600; cursor: pointer;
+}
+.scanner { display: flex; flex-direction: column; gap: 12px; }
+.viewfinder {
+  position: relative; aspect-ratio: 3 / 4; max-height: 60vh; width: 100%; border-radius: 20px;
+  overflow: hidden; background: #0d110f;
+}
+.viewfinder video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.viewfinder-msg {
+  position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
+  color: #e8ece9; padding: 24px; font-size: .95rem;
+}
+.scan-frame {
+  position: absolute; left: 10%; right: 10%; top: 35%; height: 30%;
+  border: 3px solid rgba(255,255,255,.9); border-radius: 16px;
+  box-shadow: 0 0 0 100vmax rgba(0,0,0,.35);
+}
+.scan-line {
+  position: absolute; left: 6%; right: 6%; height: 2px; background: var(--accent); top: 50%;
+  animation: scan 1.8s ease-in-out infinite alternate;
+}
+@keyframes scan { from { top: 12%; } to { top: 88%; } }
+@media (prefers-reduced-motion: reduce) { .scan-line { animation: none; } }

@@ -42,3 +42,13 @@ test('kJ werden in kcal umgerechnet, Produkte ohne Werte verworfen', () => {
   assert.equal(parseOffProduct({ code: '2', product_name: 'Y', nutriments: {} }), null)
   assert.equal(parseOffProduct({ code: '3', nutriments: { 'energy-kcal_100g': 10 } }), null)
 })
+
+import { isValidEan } from './diary.js'
+test('EAN-Prüfziffer', () => {
+  assert.equal(isValidEan('4006381333931'), true)
+  assert.equal(isValidEan('4006381333932'), false)
+  assert.equal(isValidEan('96385074'), true)
+  assert.equal(isValidEan('036000291452'), true)
+  assert.equal(isValidEan('12345'), false)
+  assert.equal(isValidEan('abc'), false)
+})

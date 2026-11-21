@@ -21,3 +21,14 @@ export async function searchFoods(query, { signal } = {}) {
   const data = await res.json()
   return (data.products || []).map(parseOffProduct).filter(Boolean)
 }
+
+// Produkt per Barcode abrufen. Gibt null zurück, wenn es nicht in der Datenbank ist
+// oder keine Nährwerte hat.
+export async function lookupBarcode(code, { signal } = {}) {
+  const res = await fetch(`${BASE}/api/v2/product/${encodeURIComponent(code)}.json?fields=${FIELDS}`, { signal })
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error(`Abruf fehlgeschlagen (${res.status})`)
+  const data = await res.json()
+  if (data.status !== 1 || !data.product) return null
+  return parseOffProduct({ code, ...data.product })
+}
